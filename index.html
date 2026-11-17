@@ -57,6 +57,13 @@
   .kind.extra{color:var(--ot);border:1px solid var(--ot)}
   .kind.cancelled{color:var(--muted);border:1px solid var(--line);text-decoration:line-through}
 
+  /* 月曆標頭（電腦版才顯示，手機用頂端的月份列） */
+  .calhead{display:none}
+  .navbtn{background:var(--accent);color:#fff;border-radius:12px;padding:10px 16px;font-size:15px;font-weight:600;min-width:96px}
+  .navbtn:hover{filter:brightness(1.1)}
+  .calttl{display:flex;flex-direction:column;align-items:center;gap:2px}
+  .calttl strong{font-size:22px;letter-spacing:.02em}
+  .thism{font-size:12px;color:var(--accent);text-decoration:underline;padding:0}
   /* 月曆 */
   .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
   .cal .h{text-align:center;font-size:12px;color:var(--muted);padding-bottom:2px}
@@ -132,6 +139,9 @@
     .layout{display:grid;grid-template-columns:minmax(340px,400px) 1fr;gap:16px;align-items:start}
     .left,.right{display:block}
     .cell{aspect-ratio:auto;height:58px}
+    .wrap > .monthnav{display:none}
+    .calhead{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+    .left{position:static}
   }
 </style>
 </head>
@@ -574,7 +584,7 @@ function summaryHtml() {
   const t = state.data.summary.totals, r = state.data.rates, owe = t.outstanding;
   return `
   <div class="card o-sum">
-    <h2>${state.role === 'employer' ? '本月應付' : '本月應領'}</h2>
+    <h2>${+state.month.slice(5)} 月${state.role === 'employer' ? '應付' : '應領'}</h2>
     <div class="big">${money(t.due)}</div>
     <div class="split">
       <div class="f"><b>${money(t.fixed.pay)}</b><span>固定 ${t.fixed.days} 天</span></div>
@@ -613,6 +623,11 @@ function calendarHtml() {
   }
   return `
   <div class="card o-cal">
+    <div class="calhead">
+      <button class="navbtn" data-nav="-1" title="上個月（←）">‹ <span>${+shiftMonth(state.month, -1).slice(5)} 月</span></button>
+      <div class="calttl"><strong>${y} 年 ${m} 月</strong>${state.month !== TODAY.slice(0, 7) ? `<button class="text thism" data-nav="0">回到本月</button>` : ''}</div>
+      <button class="navbtn" data-nav="1" title="下個月（→）"><span>${+shiftMonth(state.month, 1).slice(5)} 月</span> ›</button>
+    </div>
     <h2>月曆${state.role === 'employer' ? '・點日期排班' : '・點日期填上下班'}</h2>
     <div class="cal">${cells.join('')}</div>
     <div class="legend">
@@ -770,9 +785,9 @@ function render() {
     </header>
     ${API_URL ? '' : `<div class="demo">試用模式：資料只存在這個瀏覽器。已預先放入「母照顧的六日」固定排班（2026/12/12 起每隔 2 週，至 2027/2/28）與部分測試紀錄。 <button class="text" id="reset" style="color:inherit;text-decoration:underline">重置測試資料</button></div>`}
     <div class="monthnav">
-      <button class="ghost" id="prev">‹</button>
+      <button class="ghost" data-nav="-1">‹</button>
       <strong>${y} 年 ${+m} 月</strong>
-      <button class="ghost" id="next">›</button>
+      <button class="ghost" data-nav="1">›</button>
     </div>
     <div class="layout">
       <div class="left">
@@ -789,6 +804,17 @@ function render() {
   bind();
 }
 
+function goMonth(k) {
+  state.month = k === 0 ? TODAY.slice(0, 7) : shiftMonth(state.month, k);
+  state.sel = null; state.ruleEdit = null; load();
+}
+/* 電腦版：鍵盤 ← → 切換月份（在輸入框裡不觸發） */
+document.addEventListener('keydown', e => {
+  if (!state.data || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if (e.key === 'ArrowLeft') goMonth(-1);
+  if (e.key === 'ArrowRight') goMonth(1);
+});
+
 async function run(fn, okMsg, keepSel) {
   if (state.busy) return; state.busy = true;
   try { const r = await fn(); const msg = typeof okMsg === 'function' ? okMsg(r) : okMsg; if (msg) toast(msg); if (!keepSel) state.sel = null; await load(); }
@@ -798,8 +824,7 @@ async function run(fn, okMsg, keepSel) {
 
 function bind() {
   $('#logout').onclick = () => { sessionSet('pin', ''); sessionSet('role', ''); state.pin = ''; state.sel = null; renderLogin(); };
-  $('#prev').onclick = () => { state.month = shiftMonth(state.month, -1); state.sel = null; load(); };
-  $('#next').onclick = () => { state.month = shiftMonth(state.month, 1); state.sel = null; load(); };
+  document.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => goMonth(+b.dataset.nav));
   if ($('#reset')) $('#reset').onclick = e => confirm2(e.target, '再點一次確定重置', () => MemStore.reset());
 
   document.querySelectorAll('[data-sel]').forEach(el => el.onclick = () => {
