@@ -152,7 +152,9 @@ var Core = (function () {
   var DEFAULTS = {
     hourly_rate: '500',        // 正常時薪
     overtime_rate: '500',      // 加班時薪
-    overtime_unit_min: '15',   // 加班以幾分鐘為一單位（未滿不計）
+    overtime_unit_min: '15',          // 正常時數計薪單位（分鐘，未滿不計）
+    overtime_half_after_min: '15',    // 加班零頭超過幾分鐘 → 算半小時
+    overtime_full_after_min: '30',    // 加班零頭超過幾分鐘 → 算一小時
     employer_pin: '1111',
     nanny_pin: '2222',
     employer_email: '',
@@ -171,7 +173,16 @@ var Core = (function () {
   function daysInMonth(month) { var p = month.split('-'); return new Date(Date.UTC(+p[0], +p[1], 0)).getUTCDate(); }
 
   function cfgFrom(s) {
-    return { hourlyRate: +s.hourly_rate || 0, overtimeRate: +(s.overtime_rate || s.hourly_rate) || 0, unit: +s.overtime_unit_min || 0 };
+    return { hourlyRate: +s.hourly_rate || 0, overtimeRate: +(s.overtime_rate || s.hourly_rate) || 0, unit: +s.overtime_unit_min || 0,
+             otHalf: s.overtime_half_after_min === undefined ? 15 : +s.overtime_half_after_min,
+             otFull: s.overtime_full_after_min === undefined ? 30 : +s.overtime_full_after_min };
+  }
+
+  /* 加班計費：整點照算；不足一小時的零頭 超過 otFull 分 → 1 小時，超過 otHalf 分 → 半小時，其餘不計 */
+  function billOvertime(m, cfg) {
+    var h = Math.floor(m / 60), r = m % 60, billed = h * 60;
+    if (r > cfg.otFull) billed += 60; else if (r > cfg.otHalf) billed += 30;
+    return billed;
   }
 
   /* 重複規則展開：從起始日那週（週一起算）開始，每隔 N 週，挑出指定星期 */
@@ -188,10 +199,10 @@ var Core = (function () {
   /* 單日計算
      正常時數 = 實際上班與排定時段重疊的部分
      加班時數 = 超過排定結束時間的部分；未排班的臨時上班整段算加班
-     正常與加班時數都以 unit 分鐘為單位，未滿一單位不計
+     正常時數以 unit 分鐘為單位（未滿不計）；加班零頭超過 15 分算半小時、超過 30 分算一小時
      早到（排定開始前）不計薪也不算加班；提早離開照實際時數計算 */
   function calcDay(sch, att, cfg) {
-    var r = { scheduledMin: 0, workedMin: 0, regularMin: 0, overtimeMin: 0, regularPay: 0, overtimePay: 0, pay: 0, state: 'none' };
+    var r = { scheduledMin: 0, workedMin: 0, regularMin: 0, overtimeMin: 0, overtimeRawMin: 0, regularPay: 0, overtimePay: 0, pay: 0, state: 'none' };
     if (sch) r.scheduledMin = Math.max(0, toMin(sch.end) - toMin(sch.start));
     if (!att || !att.status) { r.state = sch ? 'pending' : 'none'; return r; }
     if (att.status === 'not_needed') { r.state = 'not_needed'; return r; }
@@ -203,7 +214,9 @@ var Core = (function () {
       reg = Math.max(0, Math.min(b, e0) - Math.max(a, s0));
       ot = Math.max(0, b - Math.max(a, e0));
     }
-    if (cfg.unit > 0) { reg = Math.floor(reg / cfg.unit) * cfg.unit; ot = Math.floor(ot / cfg.unit) * cfg.unit; }
+    if (cfg.unit > 0) reg = Math.floor(reg / cfg.unit) * cfg.unit;
+    r.overtimeRawMin = ot;
+    ot = billOvertime(ot, cfg);
     r.earlyLeave = !!(sch && b < toMin(sch.end));
     r.workedMin = worked; r.regularMin = reg; r.overtimeMin = ot;
     r.regularPay = Math.round(reg * cfg.hourlyRate / 60);
@@ -302,7 +315,7 @@ var Core = (function () {
           .map(function (m) { var x = summarize(m, sch, att, pay, cfg).totals; return { month: m, outstanding: x.outstanding, pendingDays: x.pendingDays }; })
           .filter(function (x) { return x.outstanding !== 0 || x.pendingDays > 0; });
         var rules = store.rows('rules').sort(function (a, b) { return a.start_date < b.start_date ? -1 : 1; });
-        return { ok: true, role: role, rates: { hourly: cfg.hourlyRate, overtime: cfg.overtimeRate, unit: cfg.unit },
+        return { ok: true, role: role, rates: { hourly: cfg.hourlyRate, overtime: cfg.overtimeRate, unit: cfg.unit, otHalf: cfg.otHalf, otFull: cfg.otFull },
                  nannyName: s.nanny_name, summary: sum, earlierUnsettled: unpaid, rules: rules };
       }
 
@@ -426,7 +439,7 @@ var Core = (function () {
 <script>
 /* ---------- 試用模式：記憶體儲存（與 Sheets 同樣的資料表結構） ---------- */
 const MemStore = (() => {
-  const KEY = 'nanny-demo-v4';
+  const KEY = 'nanny-demo-v5';
   let db = null;
   try { db = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
   const fresh = !db;
@@ -577,7 +590,7 @@ function summaryHtml() {
       ${owe > 0 ? `<span class="owe">未付 ${money(owe)}</span>` : owe < 0 ? `<span class="clear">溢付 ${money(-owe)}</span>` : `<span class="clear">已結清</span>`}
     </div>
     ${t.pendingDays || t.notNeededDays || t.cancelledDays || t.earlyDays ? `<div class="meta" style="margin-top:6px">${[t.pendingDays && `待填 ${t.pendingDays} 天`, t.earlyDays && `提早離開 ${t.earlyDays} 天`, t.notNeededDays && `家人在家 ${t.notNeededDays} 天`, t.cancelledDays && `取消 ${t.cancelledDays} 天`].filter(Boolean).join('・')}</div>` : ''}
-    <div class="rate">時薪 ${money(r.hourly)}・加班 ${money(r.overtime)}/小時・正常與加班都以 ${r.unit} 分鐘為單位（未滿不計）・超過排定下班才算加班・早到不計・提早走照實際</div>
+    <div class="rate">時薪 ${money(r.hourly)}（以 ${r.unit} 分鐘為單位）・加班超過 ${r.otHalf} 分算半小時 ${money(r.overtime / 2)}、超過 ${r.otFull} 分算 1 小時 ${money(r.overtime)}・早到不計・提早走照實際</div>
   </div>`;
 }
 
@@ -619,7 +632,7 @@ function panelHtml(d) {
     const info = [];
     info.push(s ? `排定 ${s.start}–${s.end}${s.manual === '1' ? '（已手動調整）' : ''}` : d.kind === 'cancelled' ? '固定排班已取消' : '目前未排班');
     if (a) info.push(a.status === 'not_needed' ? '保母：家人在家' : `保母實際 ${a.clock_in}–${a.clock_out}`);
-    if (c.state === 'done') info.push(`${money(c.pay)}${c.overtimeMin ? `（含加班 ${hm(c.overtimeMin)}）` : ''}`);
+    if (c.state === 'done') info.push(`${money(c.pay)}${c.overtimeMin ? `（加班 ${hm(c.overtimeRawMin)}，計 ${hm(c.overtimeMin)} ${money(c.overtimePay)}）` : ''}`);
     const saveLabel = !s && d.kind !== 'cancelled' ? '新增額外排班' : d.kind === 'cancelled' ? '恢復這天' : '更新時段';
     if (a) return `
     <div class="panel">
@@ -674,7 +687,7 @@ function dayHtml(d) {
   let tag = '';
   if (c.state === 'pending' || c.state === 'incomplete') tag = '<span class="tag pending">待填</span>';
   if (c.state === 'not_needed') tag = '<span class="tag off">家人在家</span>';
-  if (c.state === 'done') tag = c.overtimeMin ? `<span class="tag ot">加班 ${hm(c.overtimeMin)}</span>` : '<span class="tag done">已完成</span>';
+  if (c.state === 'done') tag = c.overtimeMin ? `<span class="tag ot">加班 ${hm(c.overtimeRawMin)}・計 ${hm(c.overtimeMin)}</span>` : '<span class="tag done">已完成</span>';
   const parts = [];
   if (s) parts.push(`排定 ${s.start}–${s.end}`); else if (d.kind === 'cancelled') parts.push('固定排班已取消'); else parts.push('未排班（臨時）');
   if (a && a.status === 'worked') parts.push(`實際 ${a.clock_in}–${a.clock_out}`);
