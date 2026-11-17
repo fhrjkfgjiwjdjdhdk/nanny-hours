@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>保母時數紀錄（測試版）</title>
+<style>
+  :root{
+    --bg:#f6f3ee; --card:#fffdf9; --ink:#2a2622; --muted:#8a8178; --line:#e6dfd5;
+    --accent:#3d6b5a; --accent-soft:#e3eee9; --warn:#b5602f; --warn-soft:#fbeadf;
+    --ot:#8a5a9e; --ot-soft:#f1e8f5; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:560px;margin:0 auto;padding:16px 14px 80px}
+  header{display:flex;align-items:center;justify-content:space-between;margin:4px 2px 14px}
+  h1{font-size:18px;margin:0;letter-spacing:.04em}
+  .badge{font-size:12px;padding:3px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent);margin-left:8px;vertical-align:2px}
+  .demo{font-size:12px;color:var(--warn);background:var(--warn-soft);padding:6px 10px;border-radius:10px;margin-bottom:12px}
+  button{font:inherit;border:0;border-radius:10px;padding:9px 14px;cursor:pointer;background:var(--accent);color:#fff}
+  button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+  button.text{background:none;color:var(--muted);padding:4px 6px}
+  button.danger{background:none;color:var(--warn);padding:6px 8px}
+  button:disabled{opacity:.5}
+  input,select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);min-width:0;width:100%}
+  input[type=checkbox],input[type=radio]{width:auto;flex:none;margin:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+  .card h2{font-size:14px;margin:0 0 10px;color:var(--muted);font-weight:600;letter-spacing:.05em}
+  .monthnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .monthnav strong{font-size:17px}
+  .big{font-size:30px;font-weight:700;line-height:1.2}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .stat{background:var(--bg);border-radius:10px;padding:8px 10px}
+  .stat b{display:block;font-size:16px}
+  .stat span{font-size:12px;color:var(--muted)}
+  .stat.ot b{color:var(--ot)}
+  .split{display:flex;gap:8px;margin-top:8px;font-size:13px}
+  .split div{flex:1;border-radius:10px;padding:6px 10px;border:1px solid var(--line)}
+  .split .f{border-left:4px solid var(--accent)}
+  .split .x{border-left:4px solid var(--ot)}
+  .split b{display:block;font-size:14px}
+  .split span{color:var(--muted);font-size:12px}
+  .payline{display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);font-size:14px}
+  .owe{color:var(--warn);font-weight:700}
+  .clear{color:var(--accent);font-weight:700}
+  .banner{background:var(--warn-soft);color:var(--warn);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;font-size:14px}
+  .banner b{display:block;margin-bottom:2px}
+  .meta{font-size:13px;color:var(--muted);margin-top:2px}
+  .rate{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;margin-left:6px;vertical-align:1px;white-space:nowrap}
+  .tag.pending{background:var(--warn-soft);color:var(--warn)}
+  .tag.off{background:#eee9e2;color:var(--muted)}
+  .tag.ot{background:var(--ot-soft);color:var(--ot)}
+  .tag.done{background:var(--accent-soft);color:var(--accent)}
+  .kind{display:inline-block;font-size:11px;font-weight:700;padding:0 6px;border-radius:5px;margin-left:6px;vertical-align:2px}
+  .kind.fixed{color:var(--accent);border:1px solid var(--accent)}
+  .kind.extra{color:var(--ot);border:1px solid var(--ot)}
+  .kind.cancelled{color:var(--muted);border:1px solid var(--line);text-decoration:line-through}
+
+  /* 月曆 */
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .cal .h{text-align:center;font-size:12px;color:var(--muted);padding-bottom:2px}
+  .cell{position:relative;aspect-ratio:1/1;min-height:40px;border-radius:9px;border:1px solid transparent;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;padding:0;color:var(--ink);font-size:14px;font-weight:600;gap:1px}
+  .cell.blank{background:none;cursor:default}
+  .cell small{font-size:10px;font-weight:600;line-height:1}
+  .cell.fixed{background:var(--accent-soft);color:var(--accent)}
+  .cell.extra{background:var(--ot-soft);color:var(--ot)}
+  .cell.cancelled small{text-decoration:line-through;color:var(--muted)}
+  .cell.today{border-color:var(--ink)}
+  .cell.sel{box-shadow:0 0 0 2px var(--ink) inset}
+  .cell .dot{position:absolute;top:4px;right:5px;width:6px;height:6px;border-radius:50%}
+  .dot.pending{background:var(--warn)} .dot.done{background:var(--accent)} .dot.off{background:#bbb}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+  .panel{background:var(--bg);border-radius:12px;padding:12px;margin-top:12px}
+  .panel h3{margin:0 0 4px;font-size:15px}
+  .trow{display:flex;gap:8px;align-items:flex-end;margin:8px 0}
+  .trow > *{flex:1;min-width:0}
+  .trow > span{flex:none;color:var(--muted);padding-bottom:9px}
+  .trow label,.fl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+  .btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px}
+  .chk{display:flex;align-items:center;gap:6px;font-size:14px;margin:8px 0}
+  .early{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:8px 0}
+  .early .chk{margin:6px 0}
+  .lock{background:#fff;border:1px dashed var(--line);border-radius:10px;padding:10px;margin-top:10px;font-size:13px;color:var(--muted)}
+
+  /* 每日紀錄 */
+  .day{display:flex;gap:10px;align-items:center;border-top:1px solid var(--line);padding:10px 2px;cursor:pointer}
+  .day:first-of-type{border-top:0}
+  .day:hover{background:#faf7f2}
+  .day .main{flex:1;min-width:0}
+  .date{font-weight:700}
+  .date .wd{font-weight:500;color:var(--muted);font-size:13px;margin-left:4px}
+  .date .wd.we{color:var(--warn)}
+  .amt{font-weight:700;white-space:nowrap}
+  .chev{color:var(--muted)}
+  .empty{color:var(--muted);font-size:14px;text-align:center;padding:14px 0}
+
+  /* 規則 */
+  .rule{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:14px}
+  .rule .btns{margin-top:2px}
+  .wds{display:flex;gap:5px;margin:4px 0 0}
+  .wds label{flex:1;max-width:46px;height:34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:9px;background:#fff;cursor:pointer;font-size:14px;color:var(--ink)}
+  .wds input{display:none}
+  .wds label:has(input:checked){background:var(--accent);border-color:var(--accent);color:#fff}
+  .form2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .form2 .wide{grid-column:1 / -1}
+
+  .pay{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+  .pay:first-of-type{border-top:0}
+  .login{max-width:320px;margin:18vh auto 0;text-align:center}
+  .login input{text-align:center;font-size:22px;letter-spacing:.4em;margin:14px 0}
+  .login button{width:100%}
+  .hint{font-size:12px;color:var(--muted);margin-top:12px}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:99px;font-size:14px;opacity:0;transition:.2s;pointer-events:none;z-index:9;max-width:90vw;text-align:center}
+  .toast.on{opacity:.92}
+
+  /* 版面：手機單欄 提醒→總計→月曆→每日→固定排班→付款；電腦左右兩欄 */
+  .layout{display:flex;flex-direction:column}
+  .left,.right{display:contents}
+  .o-rem{order:1}.o-sum{order:2}.o-cal{order:3}.o-days{order:4}.o-rules{order:5}.o-pay{order:6}
+  @media (max-width:360px){
+    .wrap{padding:12px 10px 60px}
+    .grid{grid-template-columns:1fr 1fr}
+    .grid .stat:last-child{grid-column:1 / -1}
+    .big{font-size:26px}
+    .cell{min-height:36px;font-size:13px}
+    .cell small{font-size:9px}
+  }
+  @media (min-width:900px){
+    .wrap{max-width:1100px;padding:28px 24px 60px}
+    .layout{display:grid;grid-template-columns:minmax(340px,400px) 1fr;gap:16px;align-items:start}
+    .left,.right{display:block}
+    .cell{aspect-ratio:auto;height:58px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ======== 設定：部署 Apps Script 後，把 Web App 網址貼在這裡 ======== */
+const API_URL = 'https://script.google.com/macros/s/AKfycbyCOpX2JPSmYwVYlpYx_OCWT3pWl7cHbavRFC1-4fybxoN5KPLuTlivhUXDGlZyDYXJ_g/exec';   // 留空 = 試用模式（資料只在這個瀏覽器）
+</script>
+<script>
+/* ===== 共用核心：計算與 API 邏輯（後端 Code.gs 與前端試用模式共用同一份） ===== */
+var Core = (function () {
+  var TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+  var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  var MONTH_RE = /^\d{4}-\d{2}$/;
+  var DEFAULTS = {
+    hourly_rate: '500',        // 正常時薪
+    overtime_rate: '500',      // 加班時薪
+    overtime_unit_min: '15',   // 加班以幾分鐘為一單位（未滿不計）
+    employer_pin: '1111',
+    nanny_pin: '2222',
+    employer_email: '',
+    nanny_name: '保母'
+  };
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function toMin(t) { var p = String(t).split(':'); return (+p[0]) * 60 + (+p[1]); }
+  function dayNum(date) { var p = date.split('-'); return Math.round(Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000); }
+  function weekdayOf(date) { return (dayNum(date) + 4) % 7; }            // 0=日 … 6=六
+  function mondayNum(date) { return dayNum(date) - ((weekdayOf(date) + 6) % 7); }
+  function dateAdd(date, n) {
+    var d = new Date((dayNum(date) + n) * 86400000);
+    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+  }
+  function daysInMonth(month) { var p = month.split('-'); return new Date(Date.UTC(+p[0], +p[1], 0)).getUTCDate(); }
+
+  function cfgFrom(s) {
+    return { hourlyRate: +s.hourly_rate || 0, overtimeRate: +(s.overtime_rate || s.hourly_rate) || 0, unit: +s.overtime_unit_min || 0 };
+  }
+
+  /* 重複規則展開：從起始日那週（週一起算）開始，每隔 N 週，挑出指定星期 */
+  function ruleDates(rule) {
+    var wds = String(rule.weekdays).split(',').filter(function (x) { return x !== ''; }).map(Number);
+    var iv = +rule.interval_weeks || 1, base = mondayNum(rule.start_date), out = [];
+    for (var d = rule.start_date; d <= rule.until; d = dateAdd(d, 1)) {
+      var wk = Math.round((mondayNum(d) - base) / 7);
+      if (wk % iv === 0 && wds.indexOf(weekdayOf(d)) >= 0) out.push(d);
+    }
+    return out;
+  }
+
+  /* 單日計算
+     正常時數 = 實際上班與排定時段重疊的部分
+     加班時數 = 超過排定結束時間的部分；未排班的臨時上班整段算加班
+     正常與加班時數都以 unit 分鐘為單位，未滿一單位不計
+     早到（排定開始前）不計薪也不算加班；提早離開照實際時數計算 */
+  function calcDay(sch, att, cfg) {
+    var r = { scheduledMin: 0, workedMin: 0, regularMin: 0, overtimeMin: 0, regularPay: 0, overtimePay: 0, pay: 0, state: 'none' };
+    if (sch) r.scheduledMin = Math.max(0, toMin(sch.end) - toMin(sch.start));
+    if (!att || !att.status) { r.state = sch ? 'pending' : 'none'; return r; }
+    if (att.status === 'not_needed') { r.state = 'not_needed'; return r; }
+    if (!att.clock_in || !att.clock_out) { r.state = 'incomplete'; return r; }
+    var a = toMin(att.clock_in), b = toMin(att.clock_out);
+    var worked = Math.max(0, b - a), reg = 0, ot = worked;
+    if (sch) {
+      var s0 = toMin(sch.start), e0 = toMin(sch.end);
+      reg = Math.max(0, Math.min(b, e0) - Math.max(a, s0));
+      ot = Math.max(0, b - Math.max(a, e0));
+    }
+    if (cfg.unit > 0) { reg = Math.floor(reg / cfg.unit) * cfg.unit; ot = Math.floor(ot / cfg.unit) * cfg.unit; }
+    r.earlyLeave = !!(sch && b < toMin(sch.end));
+    r.workedMin = worked; r.regularMin = reg; r.overtimeMin = ot;
+    r.regularPay = Math.round(reg * cfg.hourlyRate / 60);
+    r.overtimePay = Math.round(ot * cfg.overtimeRate / 60);
+    r.pay = r.regularPay + r.overtimePay;
+    r.state = 'done';
+    return r;
+  }
+
+  function summarize(month, schedules, attendance, payments, cfg) {
+    var sMap = {}, cMap = {}, aMap = {}, all = {};
+    schedules.forEach(function (s) {
+      if (s.date.slice(0, 7) !== month) return;
+      if (s.kind === 'cancelled') cMap[s.date] = s; else sMap[s.date] = s;
+      all[s.date] = 1;
+    });
+    attendance.forEach(function (a) { if (a.date.slice(0, 7) === month) { aMap[a.date] = a; all[a.date] = 1; } });
+    var blank = function () { return { days: 0, regularMin: 0, overtimeMin: 0, pay: 0 }; };
+    var t = { scheduledMin: 0, regularMin: 0, overtimeMin: 0, regularPay: 0, overtimePay: 0, due: 0,
+              workedDays: 0, notNeededDays: 0, pendingDays: 0, cancelledDays: 0, earlyDays: 0, paid: 0, outstanding: 0,
+              fixed: blank(), extra: blank() };
+    var days = Object.keys(all).sort().map(function (d) {
+      var s = sMap[d] || null, a = aMap[d] || null;
+      var kind = s ? (s.kind === 'fixed' ? 'fixed' : 'extra') : (cMap[d] && !a ? 'cancelled' : 'extra');
+      var c = calcDay(s, a, cfg);
+      if (kind === 'cancelled') { c.state = 'cancelled'; t.cancelledDays++; }
+      t.scheduledMin += c.scheduledMin; t.regularMin += c.regularMin; t.overtimeMin += c.overtimeMin;
+      t.regularPay += c.regularPay; t.overtimePay += c.overtimePay; t.due += c.pay;
+      if (c.state === 'done') {
+        t.workedDays++;
+        if (c.earlyLeave) t.earlyDays++;
+        var k = t[kind]; k.days++; k.regularMin += c.regularMin; k.overtimeMin += c.overtimeMin; k.pay += c.pay;
+      }
+      if (c.state === 'not_needed') t.notNeededDays++;
+      if (c.state === 'pending' || c.state === 'incomplete') t.pendingDays++;
+      return { date: d, weekday: weekdayOf(d), kind: kind, schedule: s, attendance: a, calc: c };
+    });
+    var pays = payments.filter(function (p) { return p.month === month; })
+      .sort(function (a, b) { return a.paid_at < b.paid_at ? -1 : 1; });
+    pays.forEach(function (p) { t.paid += +p.amount || 0; });
+    t.outstanding = t.due - t.paid;
+    return { month: month, days: days, totals: t, payments: pays };
+  }
+
+  function allMonths(schedules, attendance, payments) {
+    var m = {};
+    schedules.forEach(function (s) { if (s.kind !== 'cancelled') m[s.date.slice(0, 7)] = 1; });
+    attendance.forEach(function (a) { m[a.date.slice(0, 7)] = 1; });
+    payments.forEach(function (p) { m[p.month] = 1; });
+    return Object.keys(m).sort();
+  }
+
+  function need(cond, msg) { if (!cond) throw new Error(msg); }
+  function checkTime(t, label) { need(TIME_RE.test(t || ''), label + '時間格式需為 HH:MM'); }
+  function checkDate(d, label) { need(DATE_RE.test(d || ''), (label || '') + '日期格式需為 YYYY-MM-DD'); }
+  function checkMonth(m) { need(MONTH_RE.test(m || ''), '月份格式需為 YYYY-MM'); }
+  function checkRange(start, end) { checkTime(start, '開始'); checkTime(end, '結束'); need(toMin(end) > toMin(start), '結束時間需晚於開始時間'); }
+
+  function attendedSet(store) { var o = {}; store.rows('attendance').forEach(function (a) { o[a.date] = 1; }); return o; }
+  function findRow(store, table, key, val) { var r = store.rows(table).filter(function (x) { return x[key] === val; }); return r[0] || null; }
+
+  /* 依規則重新產生排班：只動「這條規則產生、沒被手動改過、保母還沒填紀錄」的日子 */
+  function regenerate(store, rule, nowIso) {
+    var att = attendedSet(store);
+    store.rows('schedules').forEach(function (s) {
+      if (s.rule_id === rule.id && s.manual !== '1' && !att[s.date]) store.remove('schedules', 'date', s.date);
+    });
+    var have = {}; store.rows('schedules').forEach(function (s) { have[s.date] = s; });
+    var added = 0, skipped = [];
+    ruleDates(rule).forEach(function (d) {
+      if (have[d]) { if (have[d].rule_id !== rule.id) skipped.push(d); return; }
+      store.upsert('schedules', 'date', { date: d, start: rule.start, end: rule.end, kind: 'fixed', rule_id: rule.id, manual: '', note: rule.note || '', updated_at: nowIso });
+      added++;
+    });
+    return { added: added, skipped: skipped };
+  }
+
+  /* store 介面：settings() / rows(table) / upsert(table, key, obj) / remove(table, key, value) / newId() */
+  function handle(p, store, nowIso) {
+    var s = store.settings();
+    var role = p.pin && p.pin === s.employer_pin ? 'employer' : (p.pin && p.pin === s.nanny_pin ? 'nanny' : null);
+    var isEmployer = role === 'employer', isNanny = role === 'nanny';
+    var cfg = cfgFrom(s);
+
+    switch (p.action) {
+      case 'login':
+        need(role, 'PIN 錯誤');
+        return { ok: true, role: role, nannyName: s.nanny_name };
+
+      case 'getMonth': {
+        need(role, '請先登入');
+        checkMonth(p.month);
+        var sch = store.rows('schedules'), att = store.rows('attendance'), pay = store.rows('payments');
+        var sum = summarize(p.month, sch, att, pay, cfg);
+        var unpaid = allMonths(sch, att, pay).filter(function (m) { return m < p.month; })
+          .map(function (m) { var x = summarize(m, sch, att, pay, cfg).totals; return { month: m, outstanding: x.outstanding, pendingDays: x.pendingDays }; })
+          .filter(function (x) { return x.outstanding !== 0 || x.pendingDays > 0; });
+        var rules = store.rows('rules').sort(function (a, b) { return a.start_date < b.start_date ? -1 : 1; });
+        return { ok: true, role: role, rates: { hourly: cfg.hourlyRate, overtime: cfg.overtimeRate, unit: cfg.unit },
+                 nannyName: s.nanny_name, summary: sum, earlierUnsettled: unpaid, rules: rules };
+      }
+
+      /* ---- 固定排班規則 ---- */
+      case 'saveRule': {
+        need(isEmployer, '只有雇主可以設定固定排班');
+        checkDate(p.start_date, '起始'); checkDate(p.until, '結束');
+        need(p.until >= p.start_date, '結束日需晚於起始日');
+        need(dayNum(p.until) - dayNum(p.start_date) <= 400, '一條規則最長約 13 個月');
+        checkRange(p.start, p.end);
+        var iv = Math.round(+p.interval_weeks || 1);
+        need(iv >= 1 && iv <= 8, '間隔需為 1–8 週');
+        var wds = (p.weekdays || []).map(Number).filter(function (x) { return x >= 0 && x <= 6; });
+        need(wds.length, '請至少選一個星期');
+        if (p.id) need(findRow(store, 'rules', 'id', p.id), '找不到這條規則');
+        var rule = { id: p.id || store.newId(), start_date: p.start_date, until: p.until, interval_weeks: String(iv),
+                     weekdays: wds.join(','), start: p.start, end: p.end, note: p.note || '', updated_at: nowIso };
+        store.upsert('rules', 'id', rule);
+        var g = regenerate(store, rule, nowIso);
+        return { ok: true, id: rule.id, added: g.added, skipped: g.skipped };
+      }
+
+      case 'deleteRule': {
+        need(isEmployer, '只有雇主可以刪除固定排班');
+        need(findRow(store, 'rules', 'id', p.id), '找不到這條規則');
+        var attd = attendedSet(store), kept = 0;
+        store.rows('schedules').forEach(function (x) {
+          if (x.rule_id !== p.id) return;
+          if (x.kind === 'cancelled' || (!attd[x.date] && x.manual !== '1')) store.remove('schedules', 'date', x.date);
+          else kept++;
+        });
+        store.remove('rules', 'id', p.id);
+        return { ok: true, kept: kept };
+      }
+
+      /* ---- 單日排班 ---- */
+      case 'saveSchedule': {
+        need(isEmployer, '只有雇主可以排班');
+        checkDate(p.date); checkRange(p.start, p.end);
+        need(!attendedSet(store)[p.date], '保母已登記這天的上下班，排定時間不能再改；提早下班請保母修改實際時間');
+        var ex = findRow(store, 'schedules', 'date', p.date);
+        var fromRule = !!(ex && ex.rule_id);
+        store.upsert('schedules', 'date', {
+          date: p.date, start: p.start, end: p.end,
+          kind: fromRule ? 'fixed' : 'extra', rule_id: fromRule ? ex.rule_id : '', manual: fromRule ? '1' : '',
+          note: p.note || '', updated_at: nowIso
+        });
+        return { ok: true, kind: fromRule ? 'fixed' : 'extra' };
+      }
+
+      case 'deleteSchedule': {
+        need(isEmployer, '只有雇主可以取消排班');
+        checkDate(p.date);
+        var row = findRow(store, 'schedules', 'date', p.date);
+        need(row && row.kind !== 'cancelled', '這天沒有排班');
+        need(!attendedSet(store)[p.date], '保母已填這天的紀錄，請先請保母清除');
+        if (row.rule_id) {   // 固定排班：留下「取消」標記，之後修改規則也不會再長回來
+          store.upsert('schedules', 'date', { date: p.date, start: '', end: '', kind: 'cancelled', rule_id: row.rule_id, manual: '1', note: '', updated_at: nowIso });
+        } else {
+          store.remove('schedules', 'date', p.date);
+        }
+        return { ok: true };
+      }
+
+      /* ---- 保母上下班 ---- */
+      case 'saveAttendance':
+        need(isNanny, '只有保母可以填寫上下班');
+        checkDate(p.date);
+        need(p.status === 'worked' || p.status === 'not_needed', '狀態錯誤');
+        var early = '';
+        if (p.status === 'worked') {
+          checkTime(p.clock_in, '上班'); checkTime(p.clock_out, '下班');
+          need(toMin(p.clock_out) > toMin(p.clock_in), '下班時間需晚於上班時間');
+          var sc = findRow(store, 'schedules', 'date', p.date);
+          if (sc && sc.kind !== 'cancelled' && toMin(p.clock_out) < toMin(sc.end)) {
+            need(p.early_reason === 'family' || p.early_reason === 'personal', '比排定提早下班，請選擇原因');
+            early = p.early_reason;
+          }
+        }
+        store.upsert('attendance', 'date', {
+          date: p.date, status: p.status,
+          clock_in: p.status === 'worked' ? p.clock_in : '', clock_out: p.status === 'worked' ? p.clock_out : '',
+          early_reason: early,
+          note: p.note || '', updated_at: nowIso
+        });
+        return { ok: true };
+
+      case 'clearAttendance':
+        need(isNanny, '只有保母可以清除紀錄');
+        checkDate(p.date);
+        store.remove('attendance', 'date', p.date);
+        return { ok: true };
+
+      /* ---- 付款 ---- */
+      case 'addPayment': {
+        need(isEmployer, '只有雇主可以登記付款');
+        checkMonth(p.month); checkDate(p.paid_at, '付款');
+        var amt = Math.round(+p.amount);
+        need(amt > 0, '金額需大於 0');
+        var id = store.newId();
+        store.upsert('payments', 'id', { id: id, month: p.month, amount: String(amt), paid_at: p.paid_at, note: p.note || '', created_at: nowIso });
+        return { ok: true, id: id };
+      }
+
+      case 'deletePayment':
+        need(isEmployer, '只有雇主可以刪除付款');
+        store.remove('payments', 'id', p.id);
+        return { ok: true };
+
+      default:
+        return { error: 'Unknown action' };
+    }
+  }
+
+  var EARLY = { family: '家人回來／雇主讓先走', personal: '保母個人因素' };
+  return { DEFAULTS: DEFAULTS, EARLY: EARLY, calcDay: calcDay, summarize: summarize, handle: handle, ruleDates: ruleDates,
+           weekdayOf: weekdayOf, daysInMonth: daysInMonth, dateAdd: dateAdd, cfgFrom: cfgFrom, toMin: toMin };
+})();
+
+</script>
+<script>
+/* ---------- 試用模式：記憶體儲存（與 Sheets 同樣的資料表結構） ---------- */
+const MemStore = (() => {
+  const KEY = 'nanny-demo-v4';
+  let db = null;
+  try { db = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+  const fresh = !db;
+  if (!db) db = { settings: Object.assign({}, Core.DEFAULTS), rules: [], schedules: [], attendance: [], payments: [] };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {} };
+  return {
+    fresh,
+    settings: () => db.settings,
+    rows: t => db[t].map(r => Object.assign({}, r)),
+    upsert(t, key, obj) { const i = db[t].findIndex(r => r[key] === obj[key]); if (i >= 0) db[t][i] = obj; else db[t].push(obj); save(); },
+    remove(t, key, v) { db[t] = db[t].filter(r => r[key] !== v); save(); },
+    newId: () => Math.random().toString(16).slice(2, 10),
+    reset() { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); }
+  };
+})();
+
+/* 試用資料：母照顧的六日，2026-12-12 起每隔 2 週，至 2027-02-28 */
+function seedDemo() {
+  const now = new Date().toISOString();
+  const E = { pin: '1111' }, N = { pin: '2222' };
+  const call = p => Core.handle(p, MemStore, now);
+  call({ ...E, action: 'saveRule', start_date: '2026-12-12', until: '2027-02-28', interval_weeks: 2, weekdays: [6, 0], start: '09:00', end: '20:00', note: '母照顧週末' });
+  call({ ...E, action: 'saveSchedule', date: '2026-12-23', start: '18:00', end: '22:00', note: '母加班' });
+  call({ ...E, action: 'saveSchedule', date: '2027-01-20', start: '18:00', end: '21:00' });
+  call({ ...E, action: 'deleteSchedule', date: '2027-01-24' });
+  const w = (date, i, o, note) => call({ ...N, action: 'saveAttendance', date, status: 'worked', clock_in: i, clock_out: o, note: note || '' });
+  w('2026-12-12', '09:00', '21:20', '晚歸延長');
+  w('2026-12-13', '08:30', '20:00', '提早到');
+  w('2026-12-23', '18:00', '22:30');
+  w('2026-12-26', '09:00', '20:10');
+  w('2027-01-09', '09:00', '20:00');
+  call({ ...N, action: 'saveAttendance', date: '2027-01-10', status: 'worked', clock_in: '09:00', clock_out: '15:10', early_reason: 'family', note: '' });
+  call({ ...E, action: 'addPayment', month: '2026-12', amount: 10000, paid_at: '2026-12-15', note: '上半月先付' });
+}
+if (!API_URL && MemStore.fresh) seedDemo();
+
+/* ---------- API ---------- */
+async function api(action, data = {}) {
+  const p = Object.assign({ action, pin: state.pin }, data);
+  let res;
+  if (!API_URL) {
+    try { res = Core.handle(p, MemStore, new Date().toISOString()); } catch (e) { res = { error: e.message }; }
+  } else {
+    const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(p) });
+    res = await r.json();
+  }
+  if (res.error) throw new Error(res.error);
+  return res;
+}
+
+/* ---------- 狀態與工具 ---------- */
+const WD = ['日', '一', '二', '三', '四', '五', '六'];
+const today = new Date();
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const TODAY = ymd(today);
+const state = {
+  pin: sessionGet('pin'), role: sessionGet('role'), nannyName: '保母',
+  month: API_URL ? TODAY.slice(0, 7) : '2026-12',
+  data: null, sel: null, ruleEdit: null, busy: false
+};
+function sessionGet(k) { try { return sessionStorage.getItem('nanny-' + k) || ''; } catch (e) { return ''; } }
+function sessionSet(k, v) { try { v ? sessionStorage.setItem('nanny-' + k, v) : sessionStorage.removeItem('nanny-' + k); } catch (e) {} }
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const money = n => 'NT$' + Number(n || 0).toLocaleString('zh-TW');
+const hrs = m => String(+(m / 60).toFixed(2)) + ' 小時';
+const hm = m => { const h = Math.floor(m / 60), r = m % 60; return (h ? h + 'h' : '') + (r ? r + 'm' : (h ? '' : '0')); };
+const md = d => `${+d.slice(5, 7)}/${+d.slice(8)}`;
+const KIND = { fixed: '固定', extra: '額外', cancelled: '已取消' };
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 2600); }
+function shiftMonth(m, k) { const [y, mo] = m.split('-').map(Number); return ymd(new Date(y, mo - 1 + k, 1)).slice(0, 7); }
+function confirm2(btn, label, fn) {
+  if (btn.dataset.armed) { fn(); return; }
+  const orig = btn.textContent; btn.dataset.armed = '1'; btn.textContent = label; btn.style.fontWeight = '700';
+  setTimeout(() => { if (btn.isConnected) { delete btn.dataset.armed; btn.textContent = orig; btn.style.fontWeight = ''; } }, 3000);
+}
+function dayInfo(date) {
+  return state.data.summary.days.find(d => d.date === date) ||
+    { date, weekday: Core.weekdayOf(date), kind: null, schedule: null, attendance: null, calc: { state: 'none' } };
+}
+
+/* ---------- 登入 ---------- */
+function renderLogin(err) {
+  $('#app').innerHTML = `
+    <div class="login">
+      <h1>保母時數紀錄</h1>
+      <input id="pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off">
+      <button id="go">登入</button>
+      ${err ? `<div class="hint" style="color:var(--warn)">${esc(err)}</div>` : ''}
+      ${API_URL ? '' : '<div class="hint">試用模式｜雇主 1111・保母 2222</div>'}
+    </div>`;
+  const go = async () => {
+    state.pin = $('#pin').value.trim();
+    try {
+      const r = await api('login');
+      state.role = r.role; state.nannyName = r.nannyName;
+      sessionSet('pin', state.pin); sessionSet('role', r.role);
+      load();
+    } catch (e) { renderLogin(e.message); }
+  };
+  $('#go').onclick = go;
+  $('#pin').onkeydown = e => { if (e.key === 'Enter') go(); };
+  $('#pin').focus();
+}
+
+async function load() {
+  try {
+    state.data = await api('getMonth', { month: state.month });
+    state.nannyName = state.data.nannyName;
+    render();
+  } catch (e) {
+    if (/PIN|登入/.test(e.message)) { sessionSet('pin', ''); return renderLogin(e.message); }
+    toast(e.message);
+  }
+}
+
+/* ---------- 區塊 ---------- */
+function reminderHtml() {
+  const d = state.data, t = d.summary.totals, out = [];
+  const curMonth = TODAY.slice(0, 7);
+  const last = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  if (state.month === curMonth && last - today.getDate() <= 2) {
+    out.push(`<b>本月即將結算</b>${state.role === 'employer' ? '應付' : '應領'} ${money(t.due)}，尚未支付 ${money(t.outstanding)}${t.pendingDays ? `；還有 ${t.pendingDays} 天未填上下班` : ''}。`);
+  } else if (state.month < curMonth && (t.outstanding > 0 || t.pendingDays > 0)) {
+    out.push(`<b>這個月尚未結清</b>未支付 ${money(t.outstanding)}${t.pendingDays ? `；${t.pendingDays} 天未填上下班` : ''}。`);
+  }
+  d.earlierUnsettled.forEach(u => out.push(`<b>${+u.month.slice(5)} 月尚未結清</b>${u.outstanding ? '未支付 ' + money(u.outstanding) : ''}${u.pendingDays ? `${u.outstanding ? '；' : ''}${u.pendingDays} 天未填上下班` : ''}`));
+  return out.length ? `<div class="o-rem">${out.map(s => `<div class="banner">${s}</div>`).join('')}</div>` : '';
+}
+
+function summaryHtml() {
+  const t = state.data.summary.totals, r = state.data.rates, owe = t.outstanding;
+  return `
+  <div class="card o-sum">
+    <h2>${state.role === 'employer' ? '本月應付' : '本月應領'}</h2>
+    <div class="big">${money(t.due)}</div>
+    <div class="split">
+      <div class="f"><b>${money(t.fixed.pay)}</b><span>固定 ${t.fixed.days} 天</span></div>
+      <div class="x"><b>${money(t.extra.pay)}</b><span>額外 ${t.extra.days} 天</span></div>
+    </div>
+    <div class="grid">
+      <div class="stat"><b>${hrs(t.regularMin)}</b><span>正常 ${money(t.regularPay)}</span></div>
+      <div class="stat ot"><b>${hrs(t.overtimeMin)}</b><span>加班 ${money(t.overtimePay)}</span></div>
+      <div class="stat"><b>${t.workedDays} 天</b><span>排定 ${hrs(t.scheduledMin)}</span></div>
+    </div>
+    <div class="payline">
+      <span>已付 ${money(t.paid)}</span>
+      ${owe > 0 ? `<span class="owe">未付 ${money(owe)}</span>` : owe < 0 ? `<span class="clear">溢付 ${money(-owe)}</span>` : `<span class="clear">已結清</span>`}
+    </div>
+    ${t.pendingDays || t.notNeededDays || t.cancelledDays || t.earlyDays ? `<div class="meta" style="margin-top:6px">${[t.pendingDays && `待填 ${t.pendingDays} 天`, t.earlyDays && `提早離開 ${t.earlyDays} 天`, t.notNeededDays && `家人在家 ${t.notNeededDays} 天`, t.cancelledDays && `取消 ${t.cancelledDays} 天`].filter(Boolean).join('・')}</div>` : ''}
+    <div class="rate">時薪 ${money(r.hourly)}・加班 ${money(r.overtime)}/小時・正常與加班都以 ${r.unit} 分鐘為單位（未滿不計）・超過排定下班才算加班・早到不計・提早走照實際</div>
+  </div>`;
+}
+
+function calendarHtml() {
+  const [y, m] = state.month.split('-').map(Number);
+  const n = Core.daysInMonth(state.month);
+  const first = (Core.weekdayOf(state.month + '-01') + 6) % 7;   // 週一為第一欄
+  const map = {}; state.data.summary.days.forEach(d => map[d.date] = d);
+  const cells = ['一', '二', '三', '四', '五', '六', '日'].map(w => `<div class="h">${w}</div>`);
+  for (let i = 0; i < first; i++) cells.push('<div class="cell blank"></div>');
+  for (let i = 1; i <= n; i++) {
+    const date = `${state.month}-${String(i).padStart(2, '0')}`, d = map[date];
+    const cls = ['cell'], st = d && d.calc.state;
+    if (d && d.kind) cls.push(d.kind);
+    if (date === TODAY) cls.push('today');
+    if (date === state.sel) cls.push('sel');
+    const dot = st === 'pending' || st === 'incomplete' ? 'pending' : st === 'done' ? 'done' : st === 'not_needed' ? 'off' : '';
+    const label = d && d.kind ? (st === 'not_needed' ? '在家' : KIND[d.kind]) : '';
+    cells.push(`<button class="${cls.join(' ')}" data-sel="${date}">${dot ? `<i class="dot ${dot}"></i>` : ''}${i}${label ? `<small>${label}</small>` : ''}</button>`);
+  }
+  return `
+  <div class="card o-cal">
+    <h2>月曆${state.role === 'employer' ? '・點日期排班' : '・點日期填上下班'}</h2>
+    <div class="cal">${cells.join('')}</div>
+    <div class="legend">
+      <span><i style="background:var(--accent-soft);border:1px solid var(--accent)"></i>固定</span>
+      <span><i style="background:var(--ot-soft);border:1px solid var(--ot)"></i>額外</span>
+      <span><i style="background:var(--warn);border-radius:50%"></i>待填</span>
+      <span><i style="background:var(--accent);border-radius:50%"></i>已完成</span>
+    </div>
+    ${state.sel && state.sel.slice(0, 7) === state.month ? panelHtml(dayInfo(state.sel)) : ''}
+  </div>`;
+}
+
+function panelHtml(d) {
+  const s = d.schedule, a = d.attendance, c = d.calc;
+  const head = `<h3>${md(d.date)} 週${WD[d.weekday]}${d.kind ? `<span class="kind ${d.kind}">${KIND[d.kind]}</span>` : ''}</h3>`;
+  if (state.role === 'employer') {
+    const info = [];
+    info.push(s ? `排定 ${s.start}–${s.end}${s.manual === '1' ? '（已手動調整）' : ''}` : d.kind === 'cancelled' ? '固定排班已取消' : '目前未排班');
+    if (a) info.push(a.status === 'not_needed' ? '保母：家人在家' : `保母實際 ${a.clock_in}–${a.clock_out}`);
+    if (c.state === 'done') info.push(`${money(c.pay)}${c.overtimeMin ? `（含加班 ${hm(c.overtimeMin)}）` : ''}`);
+    const saveLabel = !s && d.kind !== 'cancelled' ? '新增額外排班' : d.kind === 'cancelled' ? '恢復這天' : '更新時段';
+    if (a) return `
+    <div class="panel">
+      ${head}<div class="meta">${info.join('・')}</div>
+      <div class="lock">保母已登記這天的上下班，請保母來的時間已鎖定。提早下班或時間有誤，請保母修改實際時間；真的要改排定，先請保母清除這天的紀錄。</div>
+      <div class="btns"><button class="ghost" id="close">關閉</button></div>
+    </div>`;
+    return `
+    <div class="panel">
+      ${head}<div class="meta">${info.join('・')}</div>
+      <div class="fl" style="margin-top:8px">請保母來的時間</div>
+      <div class="trow" style="margin-top:2px">
+        <label>開始<input type="time" id="ss" value="${s ? s.start : d.weekday === 0 || d.weekday === 6 ? '09:00' : '18:00'}"></label><span>–</span>
+        <label>結束<input type="time" id="se" value="${s ? s.end : d.weekday === 0 || d.weekday === 6 ? '20:00' : '22:00'}"></label>
+      </div>
+      <input id="snote" placeholder="備註（選填）" value="${esc(s ? s.note : '')}">
+      <div class="btns">
+        ${s ? `<button class="danger" id="delsch">${s.kind === 'fixed' ? '這天不用（取消）' : '刪除排班'}</button>` : ''}
+        <button class="ghost" id="close">關閉</button>
+        <button id="savesch">${saveLabel}</button>
+      </div>
+    </div>`;
+  }
+  /* 保母 */
+  const off = a && a.status === 'not_needed';
+  const ci = (a && a.clock_in) || (s && s.start) || '09:00', co = (a && a.clock_out) || (s && s.end) || '18:00';
+  const info = s ? `排定 ${s.start}–${s.end}` : d.kind === 'cancelled' ? '這天雇主已取消，若仍被叫來，整段算加班' : '沒有排班，臨時被叫來的話整段算加班';
+  return `
+  <div class="panel" data-end="${s ? s.end : ''}">
+    ${head}<div class="meta">${info}</div>
+    <label class="chk"><input type="checkbox" id="off" ${off ? 'checked' : ''}> 家人在家，今天不用來</label>
+    <div class="trow" id="times" style="${off ? 'display:none' : ''}">
+      <label>上班<input type="time" id="ci" value="${ci}"></label><span>–</span>
+      <label>下班<input type="time" id="co" value="${co}"></label>
+    </div>
+    <div id="early" class="early" style="display:none">
+      <div class="fl">比排定的 ${s ? s.end : ''} 提早離開，原因是？（金額照實際時數計算）</div>
+      ${Object.keys(Core.EARLY).map(k => `<label class="chk"><input type="radio" name="er" value="${k}" ${a && a.early_reason === k ? 'checked' : ''}> ${Core.EARLY[k]}</label>`).join('')}
+    </div>
+    <input id="note" placeholder="備註（選填）" value="${esc(a ? a.note : '')}">
+    <div class="btns">
+      ${a ? `<button class="danger" id="clr">清除</button>` : ''}
+      <button class="ghost" id="close">關閉</button>
+      <button id="saveAtt">儲存</button>
+    </div>
+  </div>`;
+}
+
+function dayHtml(d) {
+  const c = d.calc, s = d.schedule, a = d.attendance;
+  const we = d.weekday === 0 || d.weekday === 6;
+  let tag = '';
+  if (c.state === 'pending' || c.state === 'incomplete') tag = '<span class="tag pending">待填</span>';
+  if (c.state === 'not_needed') tag = '<span class="tag off">家人在家</span>';
+  if (c.state === 'done') tag = c.overtimeMin ? `<span class="tag ot">加班 ${hm(c.overtimeMin)}</span>` : '<span class="tag done">已完成</span>';
+  const parts = [];
+  if (s) parts.push(`排定 ${s.start}–${s.end}`); else if (d.kind === 'cancelled') parts.push('固定排班已取消'); else parts.push('未排班（臨時）');
+  if (a && a.status === 'worked') parts.push(`實際 ${a.clock_in}–${a.clock_out}`);
+  if (s && a && a.status === 'worked' && Core.toMin(a.clock_in) < Core.toMin(s.start)) parts.push('早到不計');
+  if (c.earlyLeave) { parts.push(Core.EARLY[a.early_reason] || '未填原因'); tag = '<span class="tag off">提早離開</span>'; }
+  if (a && a.note) parts.push(esc(a.note)); else if (s && s.note) parts.push(esc(s.note));
+  return `
+  <div class="day" data-sel="${d.date}">
+    <div class="main">
+      <div class="date">${md(d.date)}<span class="wd ${we ? 'we' : ''}">週${WD[d.weekday]}</span><span class="kind ${d.kind}">${KIND[d.kind]}</span>${tag}</div>
+      <div class="meta">${parts.join('・')}</div>
+    </div>
+    <div class="amt">${c.state === 'done' ? money(c.pay) : ''}</div>
+    <span class="chev">›</span>
+  </div>`;
+}
+
+function rulesHtml() {
+  const rules = state.data.rules, emp = state.role === 'employer';
+  const desc = r => `${+r.interval_weeks === 1 ? '每週' : `每隔 ${r.interval_weeks} 週`}・${r.weekdays.split(',').map(i => WD[i]).join('')}・${r.start}–${r.end}`;
+  const list = rules.length ? rules.map(r => `
+    <div class="rule">
+      <b>${desc(r)}</b>
+      <div class="meta">${r.start_date} 起至 ${r.until}${r.note ? '・' + esc(r.note) : ''}</div>
+      ${emp ? `<div class="btns"><button class="danger" data-delrule="${r.id}">刪除規則</button><button class="ghost" data-editrule="${r.id}">修改</button></div>` : ''}
+    </div>`).join('') : '<div class="empty">尚未設定固定排班</div>';
+  let form = '';
+  if (emp) {
+    if (!state.ruleEdit) form = `<button class="ghost" id="newrule" style="width:100%">＋ 新增固定排班規則</button>`;
+    else {
+      const r = state.ruleEdit === 'new' ? { start_date: state.month + '-01', until: shiftMonth(state.month, 2) + '-' + Core.daysInMonth(shiftMonth(state.month, 2)), interval_weeks: '2', weekdays: '6,0', start: '09:00', end: '20:00', note: '' }
+        : rules.find(x => x.id === state.ruleEdit);
+      const on = r.weekdays.split(',');
+      form = `
+      <div class="panel">
+        <h3>${state.ruleEdit === 'new' ? '新增固定排班' : '修改固定排班'}</h3>
+        <div class="form2" style="margin-top:8px">
+          <label class="fl">起始日（從這天那週起算）<input type="date" id="rs" value="${r.start_date}"></label>
+          <label class="fl">結束日<input type="date" id="ru" value="${r.until}"></label>
+          <label class="fl wide">重複
+            <select id="ri">${[1, 2, 3, 4].map(i => `<option value="${i}" ${+r.interval_weeks === i ? 'selected' : ''}>${i === 1 ? '每週' : `每隔 ${i} 週`}</option>`).join('')}</select>
+          </label>
+          <div class="fl wide">星期<div class="wds" id="rw">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" value="${i}" ${on.includes(String(i)) ? 'checked' : ''}><span>${WD[i]}</span></label>`).join('')}</div></div>
+          <label class="fl">開始<input type="time" id="rt1" value="${r.start}"></label>
+          <label class="fl">結束<input type="time" id="rt2" value="${r.end}"></label>
+          <label class="fl wide">備註<input id="rn" value="${esc(r.note)}" placeholder="例：母照顧週末"></label>
+        </div>
+        <div class="meta" style="margin-top:8px">修改規則時，已填上下班、手動調整過、或已取消的日子會保留不動。</div>
+        <div class="btns"><button class="ghost" id="rcancel">取消</button><button id="rsave">${state.ruleEdit === 'new' ? '建立並排入' : '儲存並重排'}</button></div>
+      </div>`;
+    }
+  }
+  return `<div class="card o-rules"><h2>固定排班</h2>${list}${form}</div>`;
+}
+
+function paymentsHtml() {
+  const s = state.data.summary, t = s.totals;
+  const list = s.payments.length ? s.payments.map(p => `
+    <div class="pay">
+      <div><b>${money(p.amount)}</b><div class="meta">${p.paid_at}${p.note ? '・' + esc(p.note) : ''}</div></div>
+      ${state.role === 'employer' ? `<button class="danger" data-delpay="${p.id}">刪除</button>` : ''}
+    </div>`).join('') : '<div class="empty">尚無付款紀錄</div>';
+  const form = state.role === 'employer' ? `
+    <div class="form2" style="margin-top:12px">
+      <label class="fl">金額<input type="number" inputmode="numeric" id="pa" value="${t.outstanding > 0 ? t.outstanding : ''}"></label>
+      <label class="fl">付款日<input type="date" id="pd" value="${TODAY}"></label>
+      <label class="fl wide">備註<input id="pn" placeholder="選填"></label>
+      <button id="addPay" class="wide">登記已付</button>
+    </div>` : '';
+  return `<div class="card o-pay"><h2>付款紀錄</h2>${list}${form}</div>`;
+}
+
+function render() {
+  const days = state.data.summary.days;
+  const [y, m] = state.month.split('-');
+  $('#app').innerHTML = `
+    <header>
+      <h1>保母時數紀錄<span class="badge">${state.role === 'employer' ? '雇主' : esc(state.nannyName)}</span></h1>
+      <button class="text" id="logout">登出</button>
+    </header>
+    ${API_URL ? '' : `<div class="demo">試用模式：資料只存在這個瀏覽器。已預先放入「母照顧的六日」固定排班（2026/12/12 起每隔 2 週，至 2027/2/28）與部分測試紀錄。 <button class="text" id="reset" style="color:inherit;text-decoration:underline">重置測試資料</button></div>`}
+    <div class="monthnav">
+      <button class="ghost" id="prev">‹</button>
+      <strong>${y} 年 ${+m} 月</strong>
+      <button class="ghost" id="next">›</button>
+    </div>
+    <div class="layout">
+      <div class="left">
+        ${reminderHtml()}
+        ${summaryHtml()}
+        ${rulesHtml()}
+        ${paymentsHtml()}
+      </div>
+      <div class="right">
+        ${calendarHtml()}
+        <div class="card o-days"><h2>每日紀錄</h2>${days.length ? days.map(dayHtml).join('') : '<div class="empty">這個月還沒有排班</div>'}</div>
+      </div>
+    </div>`;
+  bind();
+}
+
+async function run(fn, okMsg, keepSel) {
+  if (state.busy) return; state.busy = true;
+  try { const r = await fn(); const msg = typeof okMsg === 'function' ? okMsg(r) : okMsg; if (msg) toast(msg); if (!keepSel) state.sel = null; await load(); }
+  catch (e) { toast(e.message); }
+  finally { state.busy = false; }
+}
+
+function bind() {
+  $('#logout').onclick = () => { sessionSet('pin', ''); sessionSet('role', ''); state.pin = ''; state.sel = null; renderLogin(); };
+  $('#prev').onclick = () => { state.month = shiftMonth(state.month, -1); state.sel = null; load(); };
+  $('#next').onclick = () => { state.month = shiftMonth(state.month, 1); state.sel = null; load(); };
+  if ($('#reset')) $('#reset').onclick = e => confirm2(e.target, '再點一次確定重置', () => MemStore.reset());
+
+  document.querySelectorAll('[data-sel]').forEach(el => el.onclick = () => {
+    state.sel = el.dataset.sel; render();
+    const p = document.querySelector('.panel'); if (p && el.classList.contains('day')) p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  if ($('#close')) $('#close').onclick = () => { state.sel = null; render(); };
+
+  /* 雇主：單日 */
+  if ($('#savesch')) $('#savesch').onclick = () => run(() => api('saveSchedule', { date: state.sel, start: $('#ss').value, end: $('#se').value, note: $('#snote').value.trim() }),
+    r => r.kind === 'fixed' ? '已調整這天的固定排班' : '已儲存額外排班');
+  if ($('#delsch')) $('#delsch').onclick = e => confirm2(e.target, '確定？', () => run(() => api('deleteSchedule', { date: state.sel }), '已取消這天'));
+
+  /* 保母：上下班 */
+  if ($('#off')) {
+    const end = document.querySelector('.panel').dataset.end;
+    const sync = () => {
+      const off = $('#off').checked;
+      $('#times').style.display = off ? 'none' : '';
+      $('#early').style.display = !off && end && $('#co').value && $('#co').value < end ? '' : 'none';
+    };
+    $('#off').onchange = sync; $('#co').oninput = sync; $('#co').onchange = sync; sync();
+    if ($('#clr')) $('#clr').onclick = e => confirm2(e.target, '確定清除？', () => run(() => api('clearAttendance', { date: state.sel }), '已清除'));
+    $('#saveAtt').onclick = () => {
+      const off = $('#off').checked;
+      const er = document.querySelector('input[name=er]:checked');
+      const early = $('#early').style.display !== 'none';
+      if (!off && early && !er) { toast('比排定提早下班，請選擇原因'); return; }
+      run(() => api('saveAttendance', { date: state.sel, status: off ? 'not_needed' : 'worked', clock_in: $('#ci').value, clock_out: $('#co').value, early_reason: early && er ? er.value : '', note: $('#note').value.trim() }), '已儲存');
+    };
+  }
+
+  /* 規則 */
+  if ($('#newrule')) $('#newrule').onclick = () => { state.ruleEdit = 'new'; render(); };
+  document.querySelectorAll('[data-editrule]').forEach(b => b.onclick = () => { state.ruleEdit = b.dataset.editrule; render(); });
+  document.querySelectorAll('[data-delrule]').forEach(b => b.onclick = () => confirm2(b, '確定刪除？', () =>
+    run(() => api('deleteRule', { id: b.dataset.delrule }), r => r.kept ? `已刪除；已有紀錄或手動調整的 ${r.kept} 天保留` : '已刪除規則與它排的日子')));
+  if ($('#rcancel')) $('#rcancel').onclick = () => { state.ruleEdit = null; render(); };
+  if ($('#rsave')) $('#rsave').onclick = () => {
+    const weekdays = [...document.querySelectorAll('#rw input:checked')].map(i => +i.value);
+    const id = state.ruleEdit === 'new' ? '' : state.ruleEdit;
+    run(async () => {
+      const r = await api('saveRule', { id, start_date: $('#rs').value, until: $('#ru').value, interval_weeks: +$('#ri').value, weekdays, start: $('#rt1').value, end: $('#rt2').value, note: $('#rn').value.trim() });
+      state.ruleEdit = null; return r;
+    }, r => `已排入 ${r.added} 天${r.skipped.length ? `；${r.skipped.map(md).join('、')} 已有其他排班，未覆蓋` : ''}`);
+  };
+
+  document.querySelectorAll('[data-delpay]').forEach(b => b.onclick = () => confirm2(b, '確定刪除？', () => run(() => api('deletePayment', { id: b.dataset.delpay }), '已刪除')));
+  if ($('#addPay')) $('#addPay').onclick = () => run(() => api('addPayment', { month: state.month, amount: $('#pa').value, paid_at: $('#pd').value, note: $('#pn').value.trim() }), '已登記付款');
+}
+
+state.pin ? load() : renderLogin();
+</script>
+</body>
+</html>
